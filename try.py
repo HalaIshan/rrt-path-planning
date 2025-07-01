@@ -58,13 +58,23 @@ def getNextSample(dim, samples, stepsize):
 #%%
 resent_btn = 0.0 
 last_mouse_click_time = 0.0
+reset_tree_click_time = 0.0
 last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
 
 
 
 def reset_tree():
-    global mode, source, samples, points, edges
+    global mode, source, samples, points, edges, reset_tree_click_time, last_mouse_click_time
+
+    now = time.time()
+    if now - last_mouse_click_time > 0.2:
+        return
+
+    if now - reset_tree_click_time < 0.1:
+        return
+    
+    reset_tree_click_time = now
 
     mode = 'idle'
     samples[:] = [ Sample(source) ]
