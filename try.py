@@ -21,9 +21,52 @@ def NearestSample(samples, x):
     return sid
 
 
+def bresenham(x1, y1, x2, y2):
+    # (unchanged)
+    dx, dy = abs(x2 - x1), abs(y2 - y1)
+    x, y = x1, y1
+    sx = 1 if x2>x1 else -1
+    sy = 1 if y2>y1 else -1
+
+    if dx > dy:
+        err = dx/2
+        while x != x2:
+            yield x, y
+            err -= dy
+            if err < 0:
+                y += sy
+                err += dx
+            x += sx
+        yield x, y
+    else:
+        err = dy/2
+        while y != y2:
+            yield x, y
+            err -= dx
+            if err < 0:
+                x += sx
+                err += dy
+            y += sy
+        yield x, y
+
 # check if the line between x1 and x2 intersects with the obstacles
-def Collision(img, x1, x2): 
-    pass # TODO
+def Collision(img, p1, p2):
+    """
+    Return True if the line segment from p1→p2 crosses any obstacle.
+    - img: 2D bool array (True=free, False=obs), origin at top-left.
+    - p1, p2: (x,y) world coords, origin at bottom-left.
+    """
+    h, w = img.shape
+    for wx, wy in bresenham(p1[0], p1[1], p2[0], p2[1]):
+        row = h - 1 - wy
+        col = wx
+        # bounds‐check just in case
+        if not (0 <= row < h and 0 <= col < w):
+            return True
+        if not img[row, col]:
+            return True
+    return False
+
 
 # get the next sample point
 # get the next sample point
@@ -150,8 +193,8 @@ def doRRTIteration(event):
     y,x = img.shape # get the image size. need to switch x and y due different conventions
     ns = getNextSample([x,y], samples, stepSize)
     
-    # test for collision going from p to nn
-    if Collision(img, ns.x, dest): # there is a collision
+    parent_pt = samples[ns.parent].x
+    if Collision(img, parent_pt, ns.x):  # ✅ correct: checks only the new segment
         return
     # no collision, we can add the new node
     samples.append(ns)
