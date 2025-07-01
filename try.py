@@ -35,12 +35,15 @@ def getNextSample(dim, samples, stepsize):
 
 #%%
 resent_btn = 0.0 
+last_brush = None
+brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
+
+
 
 def reset_tree():
     global mode, source, samples, points, edges
 
     mode = 'idle'
-
     samples[:] = [ Sample(source) ]
 
     plt.remove(points)
@@ -52,8 +55,24 @@ def reset_tree():
     plt.add(points)
 
     update_status("🔄 Tree reset")
+
+
+
+def reset_map():
+    global img, original_img, vd_img, plt
+    reset_tree()  # Optional: reset tree when map resets
+
+    img = original_img.copy()
+    flipped_img = np.flipud(img).astype(np.uint8) * 255  # Flip vertically to match Vedo's convention
+    new_vd_img = vd.Image(flipped_img).pickable(True)
+
+    plt.remove(vd_img)
+    plt.add(new_vd_img)
     plt.render()
 
+    vd_img = new_vd_img  # update reference
+    if validate_endpoints():
+            update_status("🧼 Map reset to original")
 
 
 
@@ -106,6 +125,7 @@ def doRRTIteration(event):
 
 
 def update_status(msg=""):
+    global mode, stepSize, mode_label, plt
     mode_label.text(f"Mode: {mode}   Step size: {stepSize}\n" + msg)
     plt.render()
 
@@ -126,32 +146,120 @@ def on_keypress(evt):
     key = evt.keypress.lower()
     if key == 'i':
         mode = 'idle'
-    elif key == 's':
-        mode = 'pick_source'
-    elif key == 'd':
-        mode = 'pick_dest'
-    else:
+        update_status("🛑 Back to idle")
         return
-    update_status()
 
+    if key == 's':
+        mode = 'pick_source'
+        update_status("🎯 Pick a new source")
+        return
 
+    if key == 'd':
+        mode = 'pick_dest'
+        update_status("🎯 Pick a new destination")
+        return
 
-def on_click(evt):
-    global mode, start_actor, goal_actor, source, dest, samples, points, edges, img, plt, z_offset, radius
-    if mode not in ['pick_source', 'pick_dest']:
+    if key == 'o':
+        # toggle draw mode
+        if mode != 'draw_obstacle':
+            mode = 'draw_obstacle'
+            update_status("⬛ Draw mode – hold & drag to paint obstacles")
+        else:
+            mode = 'idle'
+            # only validate when exiting draw mode
+            if validate_endpoints():
+                update_status("✅ Finished drawing obstacles")
+        return
+
+    if key == 'e':
+        # toggle erase mode
+        if mode != 'erase_obstacle':
+            mode = 'erase_obstacle'
+            update_status("⬜ Erase mode – hold & drag to remove obstacles")
+        else:
+            mode = 'idle'
+            update_status("✅ Finished erasing obstacles")
+        return
+
+    # all other keys do nothing
+
+    
+
+def validate_endpoints():
+    global source, dest, img, plt
+    h, w = img.shape
+    for name, pt in (('Source', source), ('Destination', dest)):
+        x, y = pt
+        fy = h - 1 - y   # flip back to image‐row index
+        if not img[fy, x]:   # False == obstacle
+            update_status(f"⚠️ {name} is now on an obstacle – press {'S' if name=='Source' else 'D'} to move")
+            return False
+    return True
+
+def obstacle_brush(evt):
+    global last_brush, img, vd_img, plt
+
+    # only paint in draw or erase mode
+    if mode not in ('draw_obstacle','erase_obstacle'):
+        last_brush = None
         return
 
     pts = evt.picked3d
-
     if pts is None:
-        mode = 'idle'
+        last_brush = None
+        return
+
+    x, y = int(round(pts[0])), int(round(pts[1]))
+    h, w = img.shape
+    if not (0 <= x < w and 0 <= y < h):
+        last_brush = None
         update_status("⚠️ Click out of bounds")
         return
 
+    fy = h - 1 - y
+    # decide target value: False=black for draw, True=white for erase
+    target = (mode == 'erase_obstacle')
+
+    # interpolate between last_brush and current
+    if last_brush is not None:
+        x0, y0 = last_brush
+        fy0 = h - 1 - y0
+        n = max(abs(x-x0), abs(fy-fy0)) or 1
+        xs = np.linspace(x0, x, n, dtype=int)
+        ys = np.linspace(fy0, fy, n, dtype=int)
+    else:
+        xs, ys = np.array([x]), np.array([fy])
+
+    # paint a little square around each interpolated point
+    for xi, yi in zip(xs, ys):
+        for dx in range(-brush_radius, brush_radius+1):
+            for dy in range(-brush_radius, brush_radius+1):
+                nx, ny = xi+dx, yi+dy
+                if 0 <= nx < w and 0 <= ny < h:
+                    img[ny, nx] = target
+
+    last_brush = (x, y)
+
+    # refresh the Vedo image actor
+    flipped = np.flipud(img).astype(np.uint8) * 255
+    new_img = vd.Image(flipped).pickable(True)
+    plt.remove(vd_img)
+    plt.add(new_img)
+    plt.render()
+    vd_img = new_img
+
+    update_status("⬛ Drawing obstacle…" if mode=='draw_obstacle'
+                  else "⬜ Erasing obstacle…")
+
+
+
+
+def add_point(evt):
+    global mode, start_actor, goal_actor, source, dest, samples, points, edges, img, plt, z_offset, radius
+    pts = evt.picked3d
+
     world_x, world_y = pts[:2]
-
     x, y = int(round(world_x)), int(round(world_y))
-
     h, w = img.shape
     if x<0 or x>=w or y<0 or y>=h:
         mode = 'idle'
@@ -159,7 +267,6 @@ def on_click(evt):
         return
 
     fy = h - 1 - y
-
     if not img[fy, x]:
         mode = 'idle'
         update_status("⚠️ Cannot place on obstacle!")
@@ -186,8 +293,31 @@ def on_click(evt):
 
     mode = 'idle'
     update_status()
+
+
+def on_click(evt):
+    global mode
+    pts = evt.picked3d
+
+    if pts is None:
+        mode = 'idle'
+        update_status("⚠️ Click out of bounds")
+        return
+    if mode == 'draw_obstacle':
+        mode = 'idle'
+        if validate_endpoints():
+            update_status("✅ Finished drawing obstacles")
+        return
+
+    if mode in ['pick_source', 'pick_dest']:
+        return add_point(evt)
     
+    mode = 'idle'
+    update_status()
     plt.render()
+    
+
+    
 
 
 
@@ -201,10 +331,11 @@ stepSize = 10
 source = np.array([0,0])
 dest = np.array([50,50])
 tree = [Sample(source)]
-mode     = 'idle'  # 'idle' | 'pick_source' | 'pick_dest'
+mode = 'idle'  # 'idle' | 'pick_source' | 'pick_dest' | 'draw_obstacle' | 'erase_obstacle'
 
 vd_img = vd.Image(imagePath).bw().binarize()
 img = vd_img.tonumpy().astype(bool)
+original_img = img.copy()
 vd_img.pickable(True)
 
 
@@ -228,10 +359,14 @@ plt.add(goal_actor)
 hint_S = vd.Text2D("S: set source", pos=(0.02, 0.98), s=1, c='green')           
 hint_D = vd.Text2D("D: set destination", pos=(0.15, 0.98), s=1,  c='blue')
 hint_I = vd.Text2D("I: back to idle",   pos=(0.30, 0.98), s=1, c='black')
-mode_label = vd.Text2D(f"Mode: {mode}   Step size: {stepSize}",pos=(0.02, 0.94), s=1, c='white', bg='black') 
+hint_O = vd.Text2D("O: draw obstacle",   pos=(0.02, 0.94), s=1, c='black')
+hint_E = vd.Text2D("E: erase obstacle",   pos=(0.15, 0.94), s=1, c='black')
+mode_label = vd.Text2D(f"Mode: {mode}   Step size: {stepSize}",pos=(0.02, 0.9), s=1, c='white', bg='black') 
 plt += hint_S
 plt += hint_D
 plt += hint_I
+plt += hint_O
+plt += hint_E
 plt += mode_label
 update_status()
 
@@ -239,9 +374,11 @@ slider = plt.add_slider(on_slider_change,   1, 100, stepSize, pos=2, title="Step
 
 button = plt.add_button(bfunc, states=[" Run ","Pause"])
 reset_btn = plt.add_button(lambda *args: reset_tree(), states=["Reset"], pos=(0.85, 0.1))
+reset_map_btn = plt.add_button(lambda *args: reset_map(), states=["Reset Map"], pos=(0.85, 0.05))
 evntid = plt.add_callback("timer", doRRTIteration, enable_picking=False)
 plt.add_callback("key press", on_keypress)
 plt.add_callback("mouse click", on_click, enable_picking=True)
+plt.add_callback("mouse move", obstacle_brush, enable_picking=True)
 timer_id = -1
 
 plt.render()
