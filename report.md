@@ -38,3 +38,32 @@ _Inspired by simple “paint” tools, we built a freehand brush for drawing and
 
  [▶ Reset Map](videos/reset.mkv)  
 *The reset video shows restoring the map to its original state. After reset, if the start or destination now lies on an obstacle, the status box warns you to press S/D and move the point.*
+
+
+## Task 1.2  
+**Add other means to change the visualization as you see fit**  
+i want to do it after i finished task 2 
+
+
+## Task 2: Implement RRT
+
+### 2.1 Complete `getNextSample`
+
+The `getNextSample` function was verified to place every new node exactly `stepSize` units from its parent by:
+
+- Sampling a point uniformly in the free space  
+- Finding its nearest existing tree node  
+- Computing the unit direction from that node toward the sample  
+- Stepping exactly `stepSize` along that direction  
+
+#### Collision-free demonstrations
+
+- **stepSize = 60**  
+  <img src="images/task2.1_step60.png" alt="RRT tree with stepSize=60" width="900"/>
+
+
+
+- **stepSize = 10**  
+  <img src="images/task2.1_step10.png" alt="RRT tree with stepSize=60" width="900"/>
+
+> **Note:** Obstacles are not yet considered; collision checking will be added in **Task 2.2**.  

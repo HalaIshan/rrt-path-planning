@@ -26,15 +26,38 @@ def Collision(img, x1, x2):
     pass # TODO
 
 # get the next sample point
+# get the next sample point
 def getNextSample(dim, samples, stepsize):
-    x = np.array([random.randint(0, d) for d in dim])
-    sid = NearestSample(samples,x)
-    nx = np.round(x) # TODO
-    ns = Sample(nx, sid)
-    return ns
+    # 1. Uniformly sample a point in [0..dim]²
+    x_rand = np.array([random.randint(0, d) for d in dim], dtype=float)
+
+    # 2. Find the nearest existing sample
+    sid    = NearestSample(samples, x_rand)
+    x_near = np.array(samples[sid].x, dtype=float)
+
+    # 3. Compute the direction vector and normalize
+    direction = x_rand - x_near
+    norm = np.linalg.norm(direction)
+    if norm == 0:
+        # if the random sample coincides exactly, pick a random unit direction
+        theta = random.random() * 2 * math.pi
+        direction = np.array([math.cos(theta), math.sin(theta)])
+    else:
+        direction /= norm
+
+    # 4. Step exactly `stepsize` along this direction
+    new_pt = x_near + direction * stepsize
+
+    # 5. Round to integer coords (so it lines up on your pixel grid)
+    new_pt = np.round(new_pt).astype(int)
+
+    # 6. Return the new Sample, linked back to its parent
+    return Sample(new_pt, sid)
+
 
 #%%
 resent_btn = 0.0 
+last_mouse_click_time = 0.0
 last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
 
@@ -78,22 +101,34 @@ def reset_map():
 
 
 def bfunc(obj, ename):
-    global timer_id, mode, resent_btn, samples
-    if mode != 'idle':
-        mode = 'idle' 
-        update_status("🔄 Restarting idle mode")
-    
+    """
+    Run/Pause button callback.
+    Only fires if a real mouse-click happened recently, and is debounced.
+    """
+    global timer_id, mode, resent_btn, last_mouse_click_time
+
     now = time.time()
+    # ignore all the PickEvent spam unless it's within 0.2 s of a real click
+    if now - last_mouse_click_time > 0.2:
+        return
+
+    # debounce the Run/Pause action itself
     if now - resent_btn < 0.1:
         return
     resent_btn = now
-    
-    current_status = button.status().strip()
-    if current_status == "Run":
-        # user just clicked “Run” → start the loop
+
+    # optional: if you’re mid-draw or something, reset to idle
+    if mode != 'idle':
+        mode = 'idle'
+        update_status("🔄 Restarting idle mode")
+    else:
+        update_status()
+
+    # toggle the timer
+    current = button.status().strip()
+    if current == "Run":
         timer_id = plt.timer_callback("create", dt=10)
     else:
-        # user clicked “Pause” → stop the loop
         plt.timer_callback("destroy", timer_id)
 
     button.switch()
@@ -296,7 +331,8 @@ def add_point(evt):
 
 
 def on_click(evt):
-    global mode
+    global mode,last_mouse_click_time
+    last_mouse_click_time = time.time()
     pts = evt.picked3d
 
     if pts is None:
