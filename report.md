@@ -260,3 +260,26 @@ In a separate run (or by continuing past the first trial), after 3000 iterations
 - The **Max-Iteration Guard** prevents infinite looping when the goal is unreachable within the budget, and offers the option to continue or reset.  
 
 ---
+
+### 2.5: Extract & Highlight the Final Path
+
+After the RRT discovers a collision-free connection to the goal, we reconstruct the exact route from start → goal and visually distinguish it from the rest of the tree.
+
+**Logic (no code):**
+
+1. **Path reconstruction**
+
+   * Start at the newly added goal‐adjacent node.
+   * Follow its `.parent` pointer back through each ancestor until reaching the root (the source).
+   * Record each node’s coordinates and then reverse the sequence so it reads from the source all the way to the goal.
+
+2. **Path highlighting**
+
+   * For each consecutive pair of waypoints along this reconstructed path, locate the corresponding tree‐edge in the existing RRT plot.
+   * Change that edge’s color to **green** and increase its line thickness—this lets the true “solution path” stand out instantly against the web of exploratory branches.
+
+
+
+<img src="images/task2_5_highlight_path.png" alt="Highlighted RRT path" width="700"/>
+
+*Figure 5.1: Once the goal is reached, the exact sequence of edges from the source (green sphere) to the goal (blue sphere) is recolored in bright green and thickened. This clearly delineates the final collision-free path amid the background of all other sampled extensions.*

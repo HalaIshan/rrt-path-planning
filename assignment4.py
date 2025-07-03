@@ -49,6 +49,41 @@ def bresenham(x1, y1, x2, y2):
             y += sy
         yield x, y
 
+def extract_path(samples, goal_idx, dest):
+    """
+    Reconstructs the RRT path from source → goal → dest.
+    - samples: list of Sample objects
+    - goal_idx: index of the goal node in samples
+    - dest: (x,y) tuple of the true destination
+    Returns: list of (x,y) waypoints from source to dest.
+    """
+    path = [tuple(dest)]
+    idx  = goal_idx
+    while idx is not None:
+        path.append(tuple(samples[idx].x))
+        idx = samples[idx].parent
+    return path[::-1]
+
+
+def recolor_path_edges(path_pts, color='green', width=4):
+    """
+    Given path_pts = [(x0,y0), (x1,y1), …, (xn,yn)],
+    find and recolor the matching Line actors in edges[].
+    """
+    global edges, plt
+    for p0, p1 in zip(path_pts, path_pts[1:]):
+        for edge in edges:
+            pts = edge.points        # grab the Nx3 array
+            A, B = pts[0][:2], pts[-1][:2]
+            if (np.allclose(A, p0) and np.allclose(B, p1)) \
+            or (np.allclose(A, p1) and np.allclose(B, p0)):
+                edge.c(color)
+                edge.lw(width)
+                break
+    plt.render()
+
+
+
 # check if the line between x1 and x2 intersects with the obstacles
 def Collision(img, p1, p2):
     """
@@ -128,6 +163,7 @@ def reset_tree():
     for e in edges:
         plt.remove(e)
     edges.clear()
+    plt.remove('path')
 
     points = vd.Points([source], r=radius)
     plt.add(points)
@@ -151,6 +187,7 @@ def reset_map():
     vd_img = new_vd_img  # update reference
     if validate_endpoints():
             update_status("🧼 Map reset to original")
+    plt.render()
 
 
 
@@ -222,21 +259,22 @@ def doRRTIteration(event):
     # stopping condition: if new node is within one step of goal and that last segment is collision‐free
     dist_to_goal = np.linalg.norm(ns.x - dest)
     if dist_to_goal <= stepSize and not Collision(img, ns.x, dest):
-        # 1) draw the final edge in a highlight color
-        final_edge = vd.Line(ns.x, dest, lw=3).c('red')
+        final_edge = vd.Line(ns.x, dest, lw=3).c('green')
         edges.append(final_edge)
         plt.add(final_edge)
-        plt.render()
 
-        # 2) update the status box instead of printing
-        update_status("✅ Goal reached!")
+        update_status("✅ Goal reached!")    
 
-        # 3) stop future iterations
         plt.timer_callback("destroy", timer_id)
 
-        # if the button is still showing "Pause", flip it back to "Run"
         if button.status().strip() == "Pause":
             button.switch()
+
+        goal_idx = len(samples) - 1
+        path_pts = extract_path(samples, goal_idx, dest)
+        recolor_path_edges(path_pts, color='green', width=4)
+        plt.render()
+            
         return
 
 
