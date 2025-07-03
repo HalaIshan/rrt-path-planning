@@ -323,3 +323,63 @@ The screenshots below shows a tree grown under RRT\* (step size = 10, radius ≈
 * In RRT* mode, the green‐highlighted edges connect each new sample to its minimal‐cost parent within the search radius.*  
 
 
+### 3.2: Local Rewiring (Cost Reduction)
+
+In **RRT\*** mode, after hooking a new sample to its best parent, we **rewire** any existing neighbors within the radius **R** if routing them through the new sample would **lower their cost-to-come**. Concretely:
+
+1. After adding `new_sample`, compute its distance to every other node.
+2. For each neighbor `j` with
+
+   ```
+   dist(new_sample → samples[j]) ≤ R
+   ```
+
+   and whose connecting edge is collision-free, compute
+
+   ```
+   cost_via_new = new_sample.cost + dist(new_sample → samples[j])
+   ```
+3. If `cost_via_new < samples[j].cost`, we remove the old edge, set
+
+   ```python
+   samples[j].parent = new_idx
+   samples[j].cost   = cost_via_new
+   ```
+
+   and draw the new, lower-cost edge.
+
+The screenshot below (in **RRT\*** mode, step size = 10, radius ≈ 30) highlights this process: after each new addition, many nearby branches “snap” over to the fresh node whenever it offers a shorter route back to the start.
+
+<img src="images/task3_2.png" alt="RRT* local rewiring showing many branches retargeted to the new sample" width="700"/>
+
+*RRT\* rewiring in action—each green edge marks the final reaching path, while the dozens of small black branches show neighbors that got reattached through the new node for a lower total cost.*
+
+---
+
+#### Comparison: RRT vs. RRT\*
+
+Because classic **RRT** never rewires, every edge remains permanently attached to the very first (nearest-neighbor) parent, even if a much cheaper routing appears later. In contrast, **RRT\*** continually improves the tree’s cost structure via local rewiring.
+
+* **RRT**  
+  * Always hooks to the nearest geometric neighbor.  
+  * No further adjustments → suboptimal, “ragged” tree shape.  
+  * In complex maps, it may exhaust the `MAX_ITERATIONS` budget (3 000) without ever reaching the goal, requiring you to press **Run** again to continue the search.  
+
+* **RRT\***  
+  * Hooks to the minimum-cost neighbor within the user-defined radius.  
+  * Then rewires all local branches to reduce their cost-to-come → smoother, more direct connectivity.  
+  * Converges to the destination far sooner under the same iteration limit.  
+
+<img src="images/task3_2RRT.png" alt="Classic RRT: max iterations reached" width="45%"/> <img src="images/task3.2_NOT_RRT.png" alt="RRT*: path found quickly" width="45%"/>  
+
+*Left*: Classic RRT halts after 3 000 iterations with no path found.  
+*Right*: RRT\* rewiring yields a valid path (final edge in green) well before the cap.  
+
+**Note:** Classic RRT eventually will reach the goal if you continue running past the iteration limit, but its slower convergence is precisely what this comparison highlights.  
+(i can click run again and it will run again another 3000 iteration or untill the goal found)
+
+
+
+
+
+

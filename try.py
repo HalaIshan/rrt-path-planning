@@ -169,6 +169,38 @@ def choose_parent(samples, new_sample, radius, img):
 
     return best_idx, best_cost
 
+def rewire(samples, new_idx, radius, img):
+    """For RRT*: try to rewire neighbors through samples[new_idx]."""
+    new_sample = samples[new_idx]
+    # gather all positions and distances to the new sample
+    pts   = np.array([s.x for s in samples])
+    dists = np.linalg.norm(pts - new_sample.x, axis=1)
+    nbrs  = np.where((dists <= radius) & (np.arange(len(samples)) != new_idx))[0]
+    for j in nbrs:
+        # only if collision‐free from new_sample → samples[j]
+        if not Collision(img, new_sample.x, samples[j].x):
+            cost_via_new = new_sample.cost + dists[j]
+            if cost_via_new < samples[j].cost:
+                # remove old visual edge between j and its old parent
+                old_p = samples[j].parent
+                for e in edges:
+                    pts_e = e.points     # Nx3 array
+                    A, B = pts_e[0][:2], pts_e[-1][:2]
+                    if (np.allclose(A, samples[j].x) and np.allclose(B, samples[old_p].x)) \
+                    or (np.allclose(B, samples[j].x) and np.allclose(A, samples[old_p].x)):
+                        plt.remove(e)
+                        edges.remove(e)
+                        break
+                # rewire in the data
+                samples[j].parent = new_idx
+                samples[j].cost   = cost_via_new
+                # draw the new edge
+                e2 = vd.Line(samples[j].x, new_sample.x, lw=2)
+                edges.append(e2)
+                plt.add(e2)
+    plt.render()
+
+
 #%%
 resent_btn = 0.0 
 last_mouse_click_time = 0.0
@@ -292,6 +324,8 @@ def doRRTIteration(event):
     ns.parent = pid
     ns.cost   = cost
     samples.append(ns)
+    if method == 'rrt*':
+        rewire(samples, len(samples)-1, neighborRadius, img)
     
     # drawing
     points.vertices = np.vstack([points.vertices, np.hstack([ns.x,0])])
