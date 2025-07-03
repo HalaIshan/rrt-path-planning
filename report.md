@@ -3,10 +3,10 @@
 **Name:** Hala Ishan  
 **Student ID:** 213692296
 ---
-**Task 1: Complete the GUI**
+### **Task 1: Complete the GUI**
 
-### Task 1.1  
-Add the ability to set the source and destination points. Add a button to reset the tree. Add a slider to change the step size.
+---
+### 1.1 : Add the ability to set the source and destination points. Add a button to reset the tree. Add a slider to change the step size.
 
 | Requirement                               | Implementation                                                                                 |
 |-------------------------------------------|-----------------------------------------------------------------------------------------------|
@@ -15,13 +15,14 @@ Add the ability to set the source and destination points. Add a button to reset 
 | Step‐size slider (1–100)                  | Slider snaps to nearest integer; updates `stepSize` and status box live                       |
 | Run/Pause toggle                          | Debounced (0.1 s) start/stop of the timer driving RRT iterations                              |
 
-![RRT GUI Controls](./images/task1_1.png)  
+<img src="images/task1_1.png" alt="RRT GUI Controls" width="700"/>
+
 *Figure 1: Interactive GUI with key hints, status box, slider, Run/Pause & Reset buttons.   -    i changed the source and destination point then run it *  
 
 
-## Task 1.2  
-**Add a way to change the obstacle map**  
-_Inspired by simple “paint” tools, we built a freehand brush for drawing and erasing obstacles in the RRT map._
+---
+###  1.2 : Add a way to change the obstacle map  
+Inspired by simple “paint” tools, we built a freehand brush for drawing and erasing obstacles in the RRT map.
 
 | Requirement                       | Implementation                                                                                 |
 |-----------------------------------|-----------------------------------------------------------------------------------------------|
@@ -39,38 +40,44 @@ _Inspired by simple “paint” tools, we built a freehand brush for drawing and
  [▶ Reset Map](videos/reset.mkv)  
 *The reset video shows restoring the map to its original state. After reset, if the start or destination now lies on an obstacle, the status box warns you to press S/D and move the point.*
 
-
-## Task 1.3  
-**Add other means to change the visualization as you see fit**  
+---
+### 1.3 : Add other means to change the visualization as you see fit
 i want to do it after i finished task 2 
 
+---
 
-## Task 2: Implement RRT
+### **Task 2: Implement RRT**
 
-### 2.1 Complete `getNextSample`
+---
 
-The `getNextSample` function was verified to place every new node exactly `stepSize` units from its parent by:
+### 2.1 : Complete `getNextSample`
 
-- Sampling a point uniformly in the free space  
-- Finding its nearest existing tree node  
-- Computing the unit direction from that node toward the sample  
-- Stepping exactly `stepSize` along that direction  
+The `getNextSample` function works in three key steps:  
+1. Sample a random point in the map.  
+2. Find the nearest existing tree node.  
+3. “Steer” a fixed distance (`stepSize`) toward it.  
 
+Below is the core of the steering logic:
 
-#### 2.2 Implement the Collision function
+```python
+# inside getNextSample(...)
+# 2. Nearest neighbor
+sid     = NearestSample(samples, x_rand)
+x_near  = np.array(samples[sid].x, dtype=float)
 
-- **stepSize = 60**  
-  <img src="images/task2.1_step60.png" alt="RRT tree with stepSize=60" width="900"/>
+# 3. Compute unit‐direction and step
+direction = x_rand - x_near
+direction /= np.linalg.norm(direction)          # normalize to unit length
+new_pt    = x_near + direction * stepSize      # step exactly stepSize
+new_pt    = np.round(new_pt).astype(int)       # snap to integer pixels
 
+return Sample(new_pt, sid)
+````
 
+This ensures every new sample lies **exactly** `stepSize` away from its parent, before any collision checks.
 
-- **stepSize = 10**  
-  <img src="images/task2.1_step10.png" alt="RRT tree with stepSize=60" width="900"/>
-
-> **Note:** Obstacles are not yet considered; collision checking will be added in **Task 2.2**.  
-
-
-### Task 2.2 Implement Collision Checking
+---
+### 2.2 Implement the Collision function
 
 To determine whether a straight‐line segment between two nodes intersects any obstacles, we:
 
@@ -157,25 +164,24 @@ def Collision(img, p1, p2):
 
    * We also treat any pixel outside the valid image bounds as a collision to be safe (e.g. if a sample drifts just off the map).
 
----
 
-#### Sanity Check on the Full Map
+#### **Sanity Check on the Full Map**
 
 The following screenshots show the RRT growing with collision checking enabled. In both cases the tree **never** penetrates the black obstacles:
 
 - **stepSize = 10**  
-  <img src="images/sanity_stepsize10.png" alt="RRT stops at obstacles, stepSize 10" width="900"/>  
+  <img src="images/sanity_stepsize10.png" alt="RRT stops at obstacles, stepSize 10" width="700"/>  
   *Figure X: The tree explores up to each obstacle boundary but does not cross it.*
 
 - **stepSize = 15**  
-  <img src="images/sanity_stepsize15.png" alt="RRT stops at obstacles, stepSize 15" width="900"/>  
+  <img src="images/sanity_stepsize15.png" alt="RRT stops at obstacles, stepSize 15" width="700"/>  
   *Figure Y: Even with a larger step, no edge crosses the original or newly drawn obstacles, and the tree can grow into areas where I erased obstacles.*  
 
 These confirm that `Collision(img, parent, sample)` correctly rejects any extension into occupied space.
  
 ---
 
-### Task 2.3 Add Stopping Conditions
+### 2.3 : Add Stopping Conditions
 
 I enhance `doRRTIteration` with two guards:  
 
@@ -230,25 +236,24 @@ def doRRTIteration(event):
 
 I conducted numerous experiments with various `stepSize` values and iteration budgets; in every case the stopping conditions behaved correctly. Below are two representative trials, shown in the order they occur during a typical run:
 
----
+
 
 #### Trial 1 — Goal Reached  
 With `stepSize = 10` and `MAX_ITERATIONS = 3000`, the tree eventually grew close enough to the goal. A final red edge marks the successful connection, and the status box updates accordingly.
 
-<img src="images/goal_reached.png" alt="Goal reached" width="900"/>
+<img src="images/goal_reached.png" alt="Goal reached" width="700"/>
 
 *Figure 4.1: “✅ Goal reached!” confirms the RRT found a collision-free path and drew the last segment in red.*
 
----
+
 
 #### Trial 2 — Iteration Cap Reached  
 In a separate run (or by continuing past the first trial), after 3000 iterations the tree still hadn’t connected to the destination. The timer stopped automatically and the status box displayed a warning. At this point you may choose to reset the tree/map and try again, or simply increase the iteration limit.
 
-<img src="images/max_iter_reached.png" alt="Max iterations reached, no path found" width="900"/>
+<img src="images/max_iter_reached.png" alt="Max iterations reached, no path found" width="700"/>
 
 *Figure 4.2: “❌ Max iterations (3000) reached, no path found…” shows the RRT giving up after exhausting its iteration budget. You can continue running another 3000 iterations or reset and try different parameters.*
 
----
 
 **Summary:**  
 - The **Goal-Reached Check** halts and highlights the final edge as soon as a valid connection to the goal is found.  
