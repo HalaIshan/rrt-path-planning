@@ -105,7 +105,7 @@ reset_tree_click_time = 0.0
 last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
 iteration_count = 0
-MAX_ITERATIONS = 10000   # or whatever limit I choose
+MAX_ITERATIONS = 3000   # or whatever limit I choose
 
 
 
@@ -195,7 +195,9 @@ def doRRTIteration(event):
     global mode, stepSize, samples, points, edges, img, dest, plt, timer_id, iteration_count, MAX_ITERATIONS
     iteration_count += 1
     if iteration_count > MAX_ITERATIONS:
-        update_status("❌ Max iterations reached")
+        update_status(
+        f"❌ Max iterations ({MAX_ITERATIONS}) reached – no path found.\n"
+        f"You can Reset the tree or map, or continue running another {MAX_ITERATIONS} iterations.")
         plt.timer_callback("destroy", timer_id)
         if button.status().strip() == "Pause":
             button.switch()
@@ -217,9 +219,6 @@ def doRRTIteration(event):
     plt.add(edges)
     plt.render()
 
-    # check if we have reached the destination
-    if False: # TODO
-        print('stop')
     # stopping condition: if new node is within one step of goal and that last segment is collision‐free
     dist_to_goal = np.linalg.norm(ns.x - dest)
     if dist_to_goal <= stepSize and not Collision(img, ns.x, dest):

@@ -217,12 +217,41 @@ def doRRTIteration(event):
 
 **Reasoning:**
 
-* **Max‐Iteration Guard:** Stops after a fixed number of iterations (`MAX_ITERATIONS = 10 000`) to avoid an endless loop when no path exists.
+* **Max‐Iteration Guard:** Stops after a fixed number of iterations (`MAX_ITERATIONS = 3,000`) to avoid an endless loop when no path exists.
 * **Goal‐Reached Check:**
 
   * Each new edge moves exactly `stepSize`.
   * Once a node lies within `stepSize` of the goal and the final segment to the goal is obstacle‐free, we know the path is found.
   * We draw the last red edge, halt further iterations, and reset the button for a clear UI state.
 
+---
 
+### Task 2.4 Experiment: RRT Execution Until Goal
 
+I conducted numerous experiments with various `stepSize` values and iteration budgets; in every case the stopping conditions behaved correctly. Below are two representative trials, shown in the order they occur during a typical run:
+
+---
+
+#### Trial 1 — Goal Reached  
+With `stepSize = 10` and `MAX_ITERATIONS = 3000`, the tree eventually grew close enough to the goal. A final red edge marks the successful connection, and the status box updates accordingly.
+
+<img src="images/goal_reached.png" alt="Goal reached" width="900"/>
+
+*Figure 4.1: “✅ Goal reached!” confirms the RRT found a collision-free path and drew the last segment in red.*
+
+---
+
+#### Trial 2 — Iteration Cap Reached  
+In a separate run (or by continuing past the first trial), after 3000 iterations the tree still hadn’t connected to the destination. The timer stopped automatically and the status box displayed a warning. At this point you may choose to reset the tree/map and try again, or simply increase the iteration limit.
+
+<img src="images/max_iter_reached.png" alt="Max iterations reached, no path found" width="900"/>
+
+*Figure 4.2: “❌ Max iterations (3000) reached, no path found…” shows the RRT giving up after exhausting its iteration budget. You can continue running another 3000 iterations or reset and try different parameters.*
+
+---
+
+**Summary:**  
+- The **Goal-Reached Check** halts and highlights the final edge as soon as a valid connection to the goal is found.  
+- The **Max-Iteration Guard** prevents infinite looping when the goal is unreachable within the budget, and offers the option to continue or reset.  
+
+---
