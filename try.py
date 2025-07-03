@@ -104,12 +104,14 @@ last_mouse_click_time = 0.0
 reset_tree_click_time = 0.0
 last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
+iteration_count = 0
+MAX_ITERATIONS = 10000   # or whatever limit I choose
 
 
 
 def reset_tree():
-    global mode, source, samples, points, edges, reset_tree_click_time, last_mouse_click_time
-
+    global mode, source, samples, points, edges, reset_tree_click_time, last_mouse_click_time, iteration_count
+    
     now = time.time()
     if now - last_mouse_click_time > 0.2:
         return
@@ -118,7 +120,7 @@ def reset_tree():
         return
     
     reset_tree_click_time = now
-
+    iteration_count = 0
     mode = 'idle'
     samples[:] = [ Sample(source) ]
 
@@ -190,6 +192,14 @@ def bfunc(obj, ename):
     
 
 def doRRTIteration(event):
+    global mode, stepSize, samples, points, edges, img, dest, plt, timer_id, iteration_count, MAX_ITERATIONS
+    iteration_count += 1
+    if iteration_count > MAX_ITERATIONS:
+        update_status("❌ Max iterations reached")
+        plt.timer_callback("destroy", timer_id)
+        if button.status().strip() == "Pause":
+            button.switch()
+        return
     y,x = img.shape # get the image size. need to switch x and y due different conventions
     ns = getNextSample([x,y], samples, stepSize)
     
@@ -210,6 +220,25 @@ def doRRTIteration(event):
     # check if we have reached the destination
     if False: # TODO
         print('stop')
+    # stopping condition: if new node is within one step of goal and that last segment is collision‐free
+    dist_to_goal = np.linalg.norm(ns.x - dest)
+    if dist_to_goal <= stepSize and not Collision(img, ns.x, dest):
+        # 1) draw the final edge in a highlight color
+        final_edge = vd.Line(ns.x, dest, lw=3).c('red')
+        edges.append(final_edge)
+        plt.add(final_edge)
+        plt.render()
+
+        # 2) update the status box instead of printing
+        update_status("✅ Goal reached!")
+
+        # 3) stop future iterations
+        plt.timer_callback("destroy", timer_id)
+
+        # if the button is still showing "Pause", flip it back to "Run"
+        if button.status().strip() == "Pause":
+            button.switch()
+        return
 
 
 def update_status(msg=""):

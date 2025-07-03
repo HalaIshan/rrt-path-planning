@@ -172,3 +172,57 @@ The following screenshots show the RRT growing with collision checking enabled. 
   *Figure Y: Even with a larger step, no edge crosses the original or newly drawn obstacles, and the tree can grow into areas where I erased obstacles.*  
 
 These confirm that `Collision(img, parent, sample)` correctly rejects any extension into occupied space.
+ 
+---
+
+### Task 2.3 Add Stopping Conditions
+
+I enhance `doRRTIteration` with two guards:  
+
+1. **Max‐Iteration Guard**  
+   Prevents infinite looping if the goal is unreachable.  
+2. **Goal‐Reached Check**  
+   Stops as soon as a new node can connect directly to the goal.
+
+```python
+def doRRTIteration(event):
+    global iteration_count, timer_id
+
+    # 1) Max‐iteration guard
+    iteration_count += 1
+    if iteration_count > MAX_ITERATIONS:
+        update_status("❌ Max iterations reached, no path found")
+        plt.timer_callback("destroy", timer_id)
+        # return button to "Run" state if needed
+        if button.status().strip() == "Pause":
+            button.switch()
+        return
+
+    # … [sampling, collision‐check, drawing] …
+
+    # 2) Goal‐reached check
+    dist_to_goal = np.linalg.norm(ns.x - dest)
+    if dist_to_goal <= stepSize and not Collision(img, ns.x, dest):
+        # draw final connection
+        final_edge = vd.Line(ns.x, dest, lw=3).c('red')
+        edges.append(final_edge)
+        plt.add(final_edge); plt.render()
+
+        update_status("✅ Goal reached!")
+        plt.timer_callback("destroy", timer_id)
+        if button.status().strip() == "Pause":
+            button.switch()
+        return
+```
+
+**Reasoning:**
+
+* **Max‐Iteration Guard:** Stops after a fixed number of iterations (`MAX_ITERATIONS = 10 000`) to avoid an endless loop when no path exists.
+* **Goal‐Reached Check:**
+
+  * Each new edge moves exactly `stepSize`.
+  * Once a node lies within `stepSize` of the goal and the final segment to the goal is obstacle‐free, we know the path is found.
+  * We draw the last red edge, halt further iterations, and reset the button for a clear UI state.
+
+
+
