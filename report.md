@@ -17,7 +17,7 @@
 
 <img src="images/task1_1.png" alt="RRT GUI Controls" width="700"/>
 
-*Figure 1: Interactive GUI with key hints, status box, slider, Run/Pause & Reset buttons.   -    i changed the source and destination point then run it *  
+*Interactive GUI with key hints, status box, slider, Run/Pause & Reset buttons.   -    i changed the source and destination point then run it *  
 
 
 ---
@@ -171,11 +171,11 @@ The following screenshots show the RRT growing with collision checking enabled. 
 
 - **stepSize = 10**  
   <img src="images/sanity_stepsize10.png" alt="RRT stops at obstacles, stepSize 10" width="700"/>  
-  *Figure X: The tree explores up to each obstacle boundary but does not cross it.*
+  *The tree explores up to each obstacle boundary but does not cross it.*
 
 - **stepSize = 15**  
   <img src="images/sanity_stepsize15.png" alt="RRT stops at obstacles, stepSize 15" width="700"/>  
-  *Figure Y: Even with a larger step, no edge crosses the original or newly drawn obstacles, and the tree can grow into areas where I erased obstacles.*  
+  *Even with a larger step, no edge crosses the original or newly drawn obstacles, and the tree can grow into areas where I erased obstacles.*  
 
 These confirm that `Collision(img, parent, sample)` correctly rejects any extension into occupied space.
  
@@ -243,7 +243,7 @@ With `stepSize = 10` and `MAX_ITERATIONS = 3000`, the tree eventually grew close
 
 <img src="images/goal_reached.png" alt="Goal reached" width="700"/>
 
-*Figure 4.1: “✅ Goal reached!” confirms the RRT found a collision-free path and drew the last segment in red.*
+*“✅ Goal reached!” confirms the RRT found a collision-free path and drew the last segment in red.*
 
 
 
@@ -252,7 +252,7 @@ In a separate run (or by continuing past the first trial), after 3000 iterations
 
 <img src="images/max_iter_reached.png" alt="Max iterations reached, no path found" width="700"/>
 
-*Figure 4.2: “❌ Max iterations (3000) reached, no path found…” shows the RRT giving up after exhausting its iteration budget. You can continue running another 3000 iterations or reset and try different parameters.*
+*“❌ Max iterations (3000) reached, no path found…” shows the RRT giving up after exhausting its iteration budget. You can continue running another 3000 iterations or reset and try different parameters.*
 
 
 **Summary:**  
@@ -282,4 +282,44 @@ After the RRT discovers a collision-free connection to the goal, we reconstruct 
 
 <img src="images/task2_5_highlight_path.png" alt="Highlighted RRT path" width="700"/>
 
-*Figure 5.1: Once the goal is reached, the exact sequence of edges from the source (green sphere) to the goal (blue sphere) is recolored in bright green and thickened. This clearly delineates the final collision-free path amid the background of all other sampled extensions.*
+*Once the goal is reached, the exact sequence of edges from the source (green sphere) to the goal (blue sphere) is recolored in bright green and thickened. This clearly delineates the final collision-free path amid the background of all other sampled extensions.*
+
+---
+
+### **Task 3: Implement RRT\***
+
+#### RRT vs. RRT\* Mode Switching
+
+To support both the classic RRT and its optimized variant RRT\* in one GUI, I added:
+
+* A new **Method** label in the corner, showing either **RRT** or **RRT**\*.  
+* A keyboard shortcut **C** to toggle between the two modes at any time.  
+* When you press **C**, the code:
+  1. Flips the global `method` variable between `'rrt'` and `'rrt*'`.  
+  2. Calls `reset_tree()` to clear the existing tree (so the new method starts from scratch).  
+  3. Updates the on-screen **Method:** label.  
+
+
+
+### 3.1: Best-Parent Selection (Connect to Minimum-Cost Neighbor)
+
+In **RRT**\*, instead of always hooking a new sample to its geometrically closest node, we look within a user-defined radius **R** around the sample and choose the neighbor that yields the lowest **cost-to-come** (distance from the start) plus the straight-line cost to the new sample. Concretely:
+
+1. **Compute** the Euclidean distance from the new sample to *every* existing node.
+2. **Restrict** to those whose distance ≤ **R** (plus always including the absolute nearest one).
+3. **Ignore** any potential parent whose connecting edge collides with an obstacle.
+4. **Pick** the node *i* that minimizes
+
+   ```
+   cost[i] + dist(i → new_sample)
+   ```
+5. **Set** `new_sample.parent = i` and `new_sample.cost` accordingly.
+
+The screenshots below shows a tree grown under RRT\* (step size = 10, radius ≈ 30): observe how each new edge (in black) hooks back not to the nearest geometric neighbor, but to whichever node gives the lowest total cost to the start.
+
+<img src="images/task3_rrtstar_growth2.png" alt="RRT* tree hooking to minimal-cost neighbor" width="700"/>  
+<img src="images/task3_rrtstar_growth.png" alt="RRT* tree hooking to minimal-cost neighbor" width="700"/>  
+
+* In RRT* mode, the green‐highlighted edges connect each new sample to its minimal‐cost parent within the search radius.*  
+
+

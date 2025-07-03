@@ -10,9 +10,10 @@ from vedo.pyplot import DirectedGraph
 vd.settings.default_backend = 'vtk'
 #%%
 class Sample:
-    def __init__(self, x, parent = None):
+    def __init__(self, x, parent = None, cost=0.0):
         self.x = x
         self.parent = parent
+        self.cost   = cost
 
 # find the nearest sample using KDTree
 def NearestSample(samples, x):
@@ -132,6 +133,41 @@ def getNextSample(dim, samples, stepsize):
     # 6. Return the new Sample, linked back to its parent
     return Sample(new_pt, sid)
 
+def choose_parent(samples, new_sample, radius, img):
+    """
+    Returns (best_parent_idx, best_cost) according to `method`.
+    - if method=='rrt', hook to *only* the nearest neighbor
+    - if method=='rrt*', search within `radius` for the lowest‐cost parent
+    """
+    global method
+    # compute distance to every existing node
+    pts   = np.array([s.x for s in samples])
+    dists = np.linalg.norm(pts - new_sample.x, axis=1)
+
+    # 1) if plain RRT, just pick the true nearest neighbor:
+    if method == 'rrt':
+        i = np.argmin(dists)
+        return i, samples[i].cost + dists[i]
+
+    # 2) else RRT*: look in the ball for any cheaper rewires
+    #    start by seeding with the nearest anyway
+    nearest_idx = np.argmin(dists)
+    best_idx    = nearest_idx
+    best_cost   = samples[nearest_idx].cost + dists[nearest_idx]
+
+    # consider all within radius
+    nbrs = np.where(dists <= radius)[0]
+    for i in nbrs:
+        if i == nearest_idx: 
+            continue
+        # only if collision-free from i → new_sample
+        if not Collision(img, samples[i].x, new_sample.x):
+            cost_via_i = samples[i].cost + dists[i]
+            if cost_via_i < best_cost:
+                best_cost = cost_via_i
+                best_idx  = i
+
+    return best_idx, best_cost
 
 #%%
 resent_btn = 0.0 
@@ -141,6 +177,9 @@ last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
 iteration_count = 0
 MAX_ITERATIONS = 3000   # or whatever limit I choose
+neighborRadius = 30   # or hook this up to a slider
+method = 'rrt'  # or 'rrt*' if I want to implement that later
+
 
 
 
@@ -158,6 +197,7 @@ def reset_tree():
     iteration_count = 0
     mode = 'idle'
     samples[:] = [ Sample(source) ]
+    samples[0].cost = 0.0
 
     plt.remove(points)
     for e in edges:
@@ -229,7 +269,7 @@ def bfunc(obj, ename):
     
 
 def doRRTIteration(event):
-    global mode, stepSize, samples, points, edges, img, dest, plt, timer_id, iteration_count, MAX_ITERATIONS
+    global mode, stepSize, samples, points, edges, img, dest, plt, timer_id, iteration_count, MAX_ITERATIONS, method
     iteration_count += 1
     if iteration_count > MAX_ITERATIONS:
         update_status(
@@ -241,11 +281,16 @@ def doRRTIteration(event):
         return
     y,x = img.shape # get the image size. need to switch x and y due different conventions
     ns = getNextSample([x,y], samples, stepSize)
-    
-    parent_pt = samples[ns.parent].x
-    if Collision(img, parent_pt, ns.x):  # ✅ correct: checks only the new segment
+
+    # unified parent choice
+    pid, cost = choose_parent(samples, ns, neighborRadius, img)
+
+    # collision check on the *chosen* edge
+    if Collision(img, samples[pid].x, ns.x):
         return
-    # no collision, we can add the new node
+
+    ns.parent = pid
+    ns.cost   = cost
     samples.append(ns)
     
     # drawing
@@ -296,7 +341,7 @@ def on_slider_change(widget, event):
 
 
 def on_keypress(evt):
-    global mode
+    global mode, method, method_label, last_mouse_click_time
     key = evt.keypress.lower()
     if key == 'i':
         mode = 'idle'
@@ -334,6 +379,15 @@ def on_keypress(evt):
             mode = 'idle'
             update_status("✅ Finished erasing obstacles")
         return
+    if key == 'c':
+        method = 'rrt*' if method=='rrt' else 'rrt'
+        txt = "RRT*" if method == 'rrt*' else "RRT"
+        method_label.text(f"Method: {txt}")
+        last_mouse_click_time = time.time()
+        reset_tree()  
+        plt.render()
+        
+
 
     # all other keys do nothing
 
@@ -516,14 +570,19 @@ hint_D = vd.Text2D("D: set destination", pos=(0.15, 0.98), s=1,  c='blue')
 hint_I = vd.Text2D("I: back to idle",   pos=(0.30, 0.98), s=1, c='black')
 hint_O = vd.Text2D("O: draw obstacle",   pos=(0.02, 0.94), s=1, c='black')
 hint_E = vd.Text2D("E: erase obstacle",   pos=(0.15, 0.94), s=1, c='black')
+hint_C = vd.Text2D("C: press C to switch RRT/RRT*", pos=(0.02, 0.8), s=1, c='black')
 mode_label = vd.Text2D(f"Mode: {mode}   Step size: {stepSize}",pos=(0.02, 0.9), s=1, c='white', bg='black') 
+method_label = vd.Text2D(f"Method: RRT", pos=(0.02, 0.75), s=1, c='white', bg='black')
 plt += hint_S
 plt += hint_D
 plt += hint_I
 plt += hint_O
 plt += hint_E
+plt += hint_C
 plt += mode_label
+plt += method_label
 update_status()
+
 
 slider = plt.add_slider(on_slider_change,   1, 100, stepSize, pos=2, title="Step Size")
 
