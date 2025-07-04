@@ -58,12 +58,6 @@ Below are two recorded demos of the RRT/RRT* runs:
 
 [▶ Demo 2 - RRT*](videos/task1_3_2.mkv)  
 
-<video controls width="640" preload="metadata">
-  <source src="videos/task1_3_2.mkv" type="video/x-matroska">
-  Your browser does not support the video tag.
-</video>
-
-
 
 ---
 
