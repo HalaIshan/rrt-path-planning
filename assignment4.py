@@ -205,6 +205,7 @@ def rewire(samples, new_idx, radius, img):
 resent_btn = 0.0 
 last_mouse_click_time = 0.0
 reset_tree_click_time = 0.0
+on_play_btn_time = 0.0
 last_brush = None
 brush_radius = 2   # will paint a (2·2+1)×(2·2+1)=5×5 block around each point
 iteration_count = 0
@@ -212,6 +213,21 @@ MAX_ITERATIONS = 3000   # or whatever limit I choose
 neighborRadius = 30   # or hook this up to a slider
 method = 'rrt'  # or 'rrt*' if I want to implement that later
 
+recorded_path   = []     # filled when you reach the goal: list of (pt0, pt1) pairs
+path_edges = []    # global, alongside `edges` and `recorded_path`
+
+def path_length(path):
+    return sum(
+        np.linalg.norm(np.array(a) - np.array(b))
+        for a,b in path)
+
+
+def update_stats():
+    global iteration_count, samples, stats_label, plt
+    stats_label.text(
+        f"Iteration: {iteration_count}\n"
+        f"Nodes: {len(samples)}\n")
+    plt.render()
 
 
 
@@ -230,11 +246,20 @@ def reset_tree():
     mode = 'idle'
     samples[:] = [ Sample(source) ]
     samples[0].cost = 0.0
+    recorded_path.clear()
+    iteration_count = 0
+    update_stats()
+
 
     plt.remove(points)
     for e in edges:
         plt.remove(e)
     edges.clear()
+
+    for e in path_edges:
+        plt.remove(e)
+    path_edges.clear()
+    recorded_path.clear()
     plt.remove('path')
 
     points = vd.Points([source], r=radius)
@@ -260,7 +285,6 @@ def reset_map():
     if validate_endpoints():
             update_status("🧼 Map reset to original")
     plt.render()
-
 
 
 
@@ -297,9 +321,44 @@ def bfunc(obj, ename):
 
     button.switch()
 
-    
-    
 
+def _on_play_path(btn, _):
+    global last_mouse_click_time, on_play_btn_time
+    now = time.time()
+    if now - last_mouse_click_time > 0.2:
+        return
+
+    if now - on_play_btn_time < 0.1:
+        return
+    if not recorded_path:
+        update_status("⚠️ No path found yet — run until you reach the goal first")
+        return
+    on_play_btn_time = now
+
+    if button.status().strip()=="Pause":
+        plt.timer_callback("destroy", timer_id)
+        button.switch()
+
+    for e in edges:
+        plt.remove(e)
+    edges.clear()
+
+    for e in path_edges:
+        plt.remove(e)
+    path_edges.clear()
+    plt.render()
+
+    for a,b in recorded_path:
+        seg = vd.Line(a, b, lw=4).c('green')
+        plt.add(seg)
+        path_edges.append(seg)
+        plt.render()
+        time.sleep(0.2)
+
+    update_status("▶️ Path replay finished")
+
+
+    
 def doRRTIteration(event):
     global mode, stepSize, samples, points, edges, img, dest, plt, timer_id, iteration_count, MAX_ITERATIONS, method
     iteration_count += 1
@@ -334,6 +393,9 @@ def doRRTIteration(event):
     plt.remove('Line')
     plt.add(edges)
     plt.render()
+    if iteration_count % 10 == 0:
+        update_stats()
+
 
     # stopping condition: if new node is within one step of goal and that last segment is collision‐free
     dist_to_goal = np.linalg.norm(ns.x - dest)
@@ -342,7 +404,8 @@ def doRRTIteration(event):
         edges.append(final_edge)
         plt.add(final_edge)
 
-        update_status("✅ Goal reached!")    
+        update_status("✅ Goal reached!")   
+        update_stats() 
 
         plt.timer_callback("destroy", timer_id)
 
@@ -351,9 +414,16 @@ def doRRTIteration(event):
 
         goal_idx = len(samples) - 1
         path_pts = extract_path(samples, goal_idx, dest)
-        recolor_path_edges(path_pts, color='green', width=4)
+        recorded_path[:] = list(zip(path_pts[:-1], path_pts[1:]))
+        for e in path_edges:
+            plt.remove(e)
+        path_edges.clear()
+
+        for a,b in recorded_path:
+            e = vd.Line(a,b, lw=3).c('green')
+            plt.add(e)
+            path_edges.append(e)
         plt.render()
-            
         return
 
 
@@ -616,7 +686,8 @@ plt += hint_C
 plt += mode_label
 plt += method_label
 update_status()
-
+stats_label = vd.Text2D("", pos=(0.02, 0.71), c='black', bg='white', s=1)
+plt.add(stats_label)
 
 slider = plt.add_slider(on_slider_change,   1, 100, stepSize, pos=2, title="Step Size")
 
@@ -624,6 +695,7 @@ button = plt.add_button(bfunc, states=[" Run ","Pause"])
 reset_btn = plt.add_button(lambda *args: reset_tree(), states=["Reset"], pos=(0.85, 0.1))
 reset_map_btn = plt.add_button(lambda *args: reset_map(), states=["Reset Map"], pos=(0.85, 0.05))
 evntid = plt.add_callback("timer", doRRTIteration, enable_picking=False)
+play_btn = plt.add_button(_on_play_path, states=[" Play Path "], pos=(0.5, 0.1))
 plt.add_callback("key press", on_keypress)
 plt.add_callback("mouse click", on_click, enable_picking=True)
 plt.add_callback("mouse move", obstacle_brush, enable_picking=True)

@@ -41,8 +41,29 @@ Inspired by simple “paint” tools, we built a freehand brush for drawing and 
 *The reset video shows restoring the map to its original state. After reset, if the start or destination now lies on an obstacle, the status box warns you to press S/D and move the point.*
 
 ---
-### 1.3 : Add other means to change the visualization as you see fit
-i want to do it after i finished task 2 
+### 1.3 Add other means to change the visualization as you see fit
+
+Beyond the core controls and the obstacle-editing brush, I implemented two new visualization features to give real-time feedback on the RRT search and to help demonstrate the final solution path.
+
+| Feature                      | Implementation                                                                                                                           |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| **Iteration & Node Count**   | Placed a 2D Text2D widget in the top-left corner showing:<br>- **Iteration:** total iterations completed<br>- **Nodes:** total tree nodes<br>This label updates every 10 iterations during the search loop and immediately when the goal is reached, so you can monitor progress quantitatively as the tree grows. |
+| **Path Replay Animation**    | Added a **Play Path** button that becomes enabled once a path to the goal is found. On click it:<br>1. Pauses any active RRT timer.<br>2. Draws each segment of the final path in bright green, one at a time, with a short delay.<br>This “step-by-step” replay makes it easy to follow exactly how the algorithm connected start to goal.<br>you can redraw that path from start as you can , each click draw it again from the start<br> it deletes as we restart the tree |
+
+## Visualization Demonstration
+
+Below are two recorded demos of the RRT/RRT* runs:
+
+[▶ Demo 1 - RRT](videos/task1_3_1.mkv)  
+<video controls width="640" preload="metadata">
+  <source src="videos/task1_3_1.mkv" type="video/x-matroska">
+</video>
+
+[▶ Demo 2 - RRT*](videos/task1_3_2.mkv)  
+<video controls width="640" preload="metadata">
+  <source src="videos/task1_3_2.mkv" type="video/x-matroska">
+</video>
+
 
 ---
 
@@ -322,7 +343,7 @@ The screenshots below shows a tree grown under RRT\* (step size = 10, radius ≈
 
 * In RRT* mode, the green‐highlighted edges connect each new sample to its minimal‐cost parent within the search radius.*  
 
-
+---
 ### 3.2: Local Rewiring (Cost Reduction)
 
 In **RRT\*** mode, after hooking a new sample to its best parent, we **rewire** any existing neighbors within the radius **R** if routing them through the new sample would **lower their cost-to-come**. Concretely:
