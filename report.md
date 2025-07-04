@@ -55,14 +55,14 @@ Beyond the core controls and the obstacle-editing brush, I implemented two new v
 Below are two recorded demos of the RRT/RRT* runs:
 
 [▶ Demo 1 - RRT](videos/task1_3_1.mkv)  
-<video controls width="640" preload="metadata">
-  <source src="videos/task1_3_1.mkv" type="video/x-matroska">
-</video>
 
 [▶ Demo 2 - RRT*](videos/task1_3_2.mkv)  
+
 <video controls width="640" preload="metadata">
   <source src="videos/task1_3_2.mkv" type="video/x-matroska">
+  Your browser does not support the video tag.
 </video>
+
 
 
 ---
