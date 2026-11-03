@@ -1,7 +1,7 @@
 # Report for Assignment 4 - Path Planning with RRT
 
 **Name:** Hala Ishan  
-**Student ID:** 213692296
+
 ---
 ### **Task 1: Complete the GUI**
 
